@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block body %}
+    <ul class="list-unstyled" id="tournament-list">
+        {% for tournament in object_list %}
+            <li>
+                <a href="{{ tournament.get_absolute_url }}">{{ tournament.name }}</a> - {{ tournament.date }}
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}

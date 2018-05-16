@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block body %}
+
+    <h1>{{ object.name }}</h1>
+    <p>
+        <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#player-list" aria-expanded="false" aria-controls="player-list">
+            Players
+        </button>
+    </p>
+    <ul class="collapse list-group list-group-flush" id="player-list">
+        {% for performance in object.standing %}
+            <li class="list-group-item">
+                <p>{{ performance.player.name }} - {{ performance.player.wins }}:{{ performance.player.losses }}</p>
+            </li>
+        {% endfor %}
+    </ul>
+    <div id="accordion">
+        {% for round in object.rounds.all %}
+            <div class="card" >
+                <div class="card-header">
+                    <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+                        Round {{ round.number }}
+                    </button>
+                </div>
+                <div class="collapse" data-parent="#accordion" id="round-{{ round.number }}"> Round {{ round.number }}</div>
+            </div>
+        {% endfor %}
+    </div>
+    <form method="post" class="uniForm">
+        {% crispy round_form %}
+    </form>
+{% endblock %}
