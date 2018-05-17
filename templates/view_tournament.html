@@ -12,7 +12,7 @@
     <ul class="collapse list-group list-group-flush" id="player-list">
         {% for performance in object.standing %}
             <li class="list-group-item">
-                <p>{{ performance.player.name }} - {{ performance.player.wins }}:{{ performance.player.losses }}</p>
+                <p>{{ performance.player.name }} - {{ performance.match_wins }}:{{ performance.match_losses }}</p>
             </li>
         {% endfor %}
     </ul>
@@ -20,15 +20,28 @@
         {% for round in object.rounds.all %}
             <div class="card" >
                 <div class="card-header">
-                    <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+                    <button class="btn btn-link" data-toggle="collapse" data-target="#round-{{ round.number }}" aria-expanded="false" aria-controls="collapseOne">
                         Round {{ round.number }}
                     </button>
                 </div>
-                <div class="collapse" data-parent="#accordion" id="round-{{ round.number }}"> Round {{ round.number }}</div>
+                <div class="collapse{% if forloop.last %} show{% endif %}" data-parent="#accordion" id="round-{{ round.number }}">
+                    <div class="card-body">
+                        {% if forloop.last %}
+                            <form method="post" class="uniForm">
+                                {% crispy round_form %}
+                            </form>
+                        {% else %}
+                            <ol>
+                                {% for duel in round.duels.all %}
+                                    <li class="list-group-item">
+                                        <p><b>{{ duel.player_1.name }}</b> {{ duel.player_1_wins }} - {{ duel.player_2_wins }} <b>{{ duel.player_2.name }}</b></p>
+                                    </li>
+                                {% endfor %}
+                            </ol>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
         {% endfor %}
     </div>
-    <form method="post" class="uniForm">
-        {% crispy round_form %}
-    </form>
 {% endblock %}
