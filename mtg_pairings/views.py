@@ -1,3 +1,6 @@
+import json
+
+from django.contrib import messages
 from django.db.transaction import atomic
 from django.http import HttpResponseRedirect
 from django.views import generic
@@ -11,6 +14,10 @@ from . import models
 class ListTournaments(generic.ListView):
     model = models.Tournament
     template_name = 'tournament_list.html'
+
+    def get_context_data(self, **kwargs):
+        context = super(ListTournaments, self).get_context_data(**kwargs)
+        return context
 
 
 class ShowTournament(generic.DetailView):
@@ -38,8 +45,13 @@ class ShowTournament(generic.DetailView):
                                                           player_2_performance.player)
                 duel.set_player_performance(player_1_performance)
                 duel.set_player_performance(player_2_performance)
+            try:
+                self.object.start_next_round()
+            except AssertionError:
+                messages.warning(request, "Couldn't pair for next round. Finished this tournament.")
+                self.object.finish()
+                return HttpResponseRedirect('#finished')
 
-            self.object.start_next_round()
             return HttpResponseRedirect('#worked')
 
         return self.render_to_response(

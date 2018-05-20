@@ -9,13 +9,30 @@
             Players
         </button>
     </p>
-    <ul class="collapse list-group list-group-flush" id="player-list">
-        {% for performance in object.standing %}
-            <li class="list-group-item">
-                <p>{{ performance.player.name }} - {{ performance.match_wins }}:{{ performance.match_losses }}</p>
-            </li>
-        {% endfor %}
-    </ul>
+    <div class="table-responsive collapse{% if object.finished %} show {% endif %}" id="player-list">
+        <table class="table table-sm table-hover">
+            <thead class="thead-dark">
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">Name</th>
+                <th class="text-right" scope="col">Matches</th>
+                <th class="text-right" scope="col">Games</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for performance in object.standing %}
+                <tr {% if forloop.counter <= 3 %}class="player-row-{{ forloop.counter }}" {% endif %}>
+                    <th scope="row">{% if forloop.counter <= 3 %}{{ forloop.counter }} {% endif %}</th>
+                    <td style="width: 80%">
+                        {{ performance.player.name }}
+                    </td>
+                    <td class="text-right">{{ performance.match_wins }} : {{ performance.match_losses }}</td>
+                    <td class="text-right">{{ performance.wins }} : {{ performance.losses }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
     <div id="accordion">
         {% for round in object.rounds.all %}
             <div class="card" >
@@ -24,9 +41,9 @@
                         Round {{ round.number }}
                     </button>
                 </div>
-                <div class="collapse{% if forloop.last %} show{% endif %}" data-parent="#accordion" id="round-{{ round.number }}">
+                <div class="collapse{% if not object.finished and forloop.last%} show{% endif %}" data-parent="#accordion" id="round-{{ round.number }}">
                     <div class="card-body">
-                        {% if forloop.last %}
+                        {% if not object.finished and forloop.last %}
                             <form method="post" class="uniForm">
                                 {% crispy round_form %}
                             </form>
