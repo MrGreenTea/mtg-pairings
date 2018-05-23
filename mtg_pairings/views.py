@@ -48,7 +48,10 @@ class ShowTournament(LoginRequiredMixin, generic.DetailView):
                 duel.set_player_performance(player_2_performance)
             try:
                 self.object.start_next_round()
-            except AssertionError:
+            except AssertionError as error:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error('Error when pairing', exc_info=error)
                 messages.warning(request, "Couldn't pair for next round. Finished this tournament.")
                 self.object.finish()
                 return HttpResponseRedirect('#finished')
