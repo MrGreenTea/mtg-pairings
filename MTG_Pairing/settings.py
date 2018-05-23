@@ -78,6 +78,17 @@ WSGI_APPLICATION = 'MTG_Pairing.wsgi.application'
 # Database,
 # https://docs.djangoproject.com/en/2.0/ref/settings/#databases
 
+if ENV('RDS_DB_NAME', default=False):
+    name = ENV('RDS_DB_NAME')
+    user = ENV('RDS_DB_USERNAME')
+    password = ENV('RDS_DB_PASSWORD')
+    host = ENV('RDS_HOSTNAME')
+    port = ENV('RDS_PORT')
+
+    os.environ.setdefault('DATABASE_URL',
+                          f'postgres://{user}:{password}@{host}:{port}/{name}')
+
+
 DATABASES = {
     'default': ENV.db_url()
 }
