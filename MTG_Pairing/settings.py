@@ -21,7 +21,7 @@ ENV = environ.Env()
 # See https://docs.djangoproject.com/en/2.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '#mpqv*k^56f9*ik7v#x^rf*p^f$%0^+-kt=*tv1mb1cgzh4!g='
+SECRET_KEY = ENV('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = ENV.bool('DJANGO_DEBUG', default=False)
@@ -131,6 +131,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.0/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = 'static/'
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 CRISPY_FAIL_SILENTLY = not DEBUG
