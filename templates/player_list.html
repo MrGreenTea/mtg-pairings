@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block body %}
+    <ul class="list-unstyled">
+        {% for player in object_list %}
+            <li>
+                <a href="{{ player.get_absolute_url }}"> {{ player.name }} </a>
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock body %}

@@ -40,15 +40,21 @@ class RoundForm(forms.Form):
     def clean(self):
         cleaned_data = super().clean()
 
+        errors = {}
         for name, value in cleaned_data.items():
 
             match = PATTERN.match(name)
             if match:
                 player_2_id = f'duel-{match.group(1)}-player2'
                 if value < settings.MATCH_WINS_NEEDED and cleaned_data[player_2_id] < settings.MATCH_WINS_NEEDED:
-                    raise ValidationError(f'Either player needs {settings.MATCH_WINS_NEEDED} wins.')
-                if value == cleaned_data[player_2_id]:
-                    raise ValidationError(f'Only one player can have {settings.MATCH_WINS_NEEDED} wins.')
+                    errors[name] = f'Either player needs {settings.MATCH_WINS_NEEDED} wins.'
+                    errors[player_2_id] = ''
+                elif value == cleaned_data[player_2_id]:
+                    errors[name] = f'Only one player can have {settings.MATCH_WINS_NEEDED} wins.'
+                    errors[player_2_id] = ''
+
+        if errors:
+            raise ValidationError(errors)
 
         return cleaned_data
 

@@ -17,17 +17,18 @@ class Player(models.Model):
     def __str__(self):
         return self.name
 
+    def get_absolute_url(self):
+        return reverse('player_detail', args=[self.name])
+
+    def duels(self):
+        return Duel.objects.filter(models.Q(player_1=self) | models.Q(player_2=self))
+
     @property
     def all_time_performance(self) -> 'Performance':
         return sum(
             (tournament.performance(self) for tournament in self.tournaments.all()),
             Performance(self, 0, 0, 0, 0)  # start
         )
-
-
-def penalty(player_1, player_2):
-    p_1, p_2 = float(player_1), float(player_2)
-    return -abs(p_1 - p_2)
 
 
 @attr.s
@@ -52,10 +53,25 @@ class Performance:
             except ZeroDivisionError:
                 return float(match_diff)
 
-    def __float__(self):
-        match_diff = self.match_wins - self.losses
+    @property
+    def win_percentage(self):
         try:
-            return match_diff + self.wins / (self.wins + self.losses)
+            return self.wins / (self.wins + self.losses)
+        except ZeroDivisionError:
+            return 0
+
+    @property
+    def match_win_percentage(self):
+        try:
+            return self.match_wins / (self.match_wins + self.match_losses)
+        except ZeroDivisionError:
+            return 0
+
+    def __float__(self):
+        match_diff = self.match_wins - self.match_losses
+        try:
+            win_percentage = self.wins / (self.wins + self.losses)
+            return match_diff + win_percentage
         except ZeroDivisionError:
             return float(match_diff)
 
@@ -78,6 +94,12 @@ class Performance:
                 wins=self.wins - other.wins,
                 losses=self.losses - other.losses
             )
+
+
+def penalty(player_1: Performance, player_2: Performance) -> float:
+    x, y = float(player_1), float(player_2)
+    p = (x ** 2 + 0.01) / (y ** 2 + 0.01)
+    return -(p + 1/p)
 
 
 class Tournament(models.Model):
@@ -262,6 +284,14 @@ class Duel(models.Model):
             self.player_2_wins = performance.wins
 
         self.save()
+
+    def opponent(self, player: Player):
+        if player == self.player_1:
+            return self.player_2
+        if player == self.player_2:
+            return self.player_1
+
+        raise ValueError(f'{player} did not play in {self}')
 
     @property
     def winner(self) -> Player:

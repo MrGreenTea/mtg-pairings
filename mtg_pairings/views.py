@@ -1,6 +1,5 @@
-import json
-
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.transaction import atomic
 from django.http import HttpResponseRedirect
 from django.views import generic
@@ -11,16 +10,18 @@ from . import models
 
 # Create your views here.
 
-class ListTournaments(generic.ListView):
+class ListTournaments(LoginRequiredMixin, generic.ListView):
     model = models.Tournament
     template_name = 'tournament_list.html'
+    queryset = model.objects.filter(finished=False)
 
     def get_context_data(self, **kwargs):
         context = super(ListTournaments, self).get_context_data(**kwargs)
+        context['finished_tournaments'] = self.model.objects.filter(finished=True)
         return context
 
 
-class ShowTournament(generic.DetailView):
+class ShowTournament(LoginRequiredMixin, generic.DetailView):
     model = models.Tournament
     template_name = 'view_tournament.html'
     fields = ['name', 'player', 'rounds']
@@ -35,7 +36,7 @@ class ShowTournament(generic.DetailView):
         return context
 
     @atomic
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *_, **__):
         self.object = self.get_object()
         form = forms.RoundForm(request.POST, round=self.object.current_round)
         if form.is_valid():
@@ -57,3 +58,13 @@ class ShowTournament(generic.DetailView):
         return self.render_to_response(
             context=self.get_context_data(round_form=form)
         )
+
+
+class ListPlayers(LoginRequiredMixin, generic.ListView):
+    model = models.Player
+    template_name = 'player_list.html'
+
+
+class ShowPlayer(LoginRequiredMixin, generic.DetailView):
+    model = models.Player
+    template_name = 'player_detail.html'

@@ -24,7 +24,7 @@
                 <tr {% if forloop.counter <= 3 %}class="player-row-{{ forloop.counter }}" {% endif %}>
                     <th scope="row">{% if forloop.counter <= 3 %}{{ forloop.counter }} {% endif %}</th>
                     <td style="width: 80%">
-                        {{ performance.player.name }}
+                        <a class="text-secondary" href="{{ performance.player.get_absolute_url }}"> {{ performance.player.name }} </a>
                     </td>
                     <td class="text-right">{{ performance.match_wins }} : {{ performance.match_losses }}</td>
                     <td class="text-right">{{ performance.wins }} : {{ performance.losses }}</td>

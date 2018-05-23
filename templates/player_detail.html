@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block body %}
+    <h4>{{ object.name }}</h4>
+    <p>
+        {% with performance=object.all_time_performance %}
+            {{ performance.match_wins}} : {{ performance.match_losses }} | {{ performance.win_percentage }}
+        {% endwith %}
+    </p>
+
+    <ul>
+        {% for tournament in object.tournaments.all %}
+            <li>
+                <a href="{{ tournament.get_absolute_url }}"> {{ tournament }} </a>
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock body %}
