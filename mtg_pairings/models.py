@@ -157,7 +157,7 @@ class Tournament(models.Model):
 
         for player, performance in all_time_performances.items():
             weighted_edges = [
-                (player, opponent, penalty(performance, opponent))
+                (player, opponent, penalty(performance, op_performance))
                 for opponent, op_performance in all_time_performances.items() if opponent != player
             ]
 
