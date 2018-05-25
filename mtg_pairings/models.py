@@ -98,8 +98,7 @@ class Performance:
 
 def penalty(player_1: Performance, player_2: Performance) -> float:
     x, y = float(player_1), float(player_2)
-    p = (x ** 2 + 0.01) / (y ** 2 + 0.01)
-    return -(p + 1/p)
+    return -abs(x-y)
 
 
 class Tournament(models.Model):
