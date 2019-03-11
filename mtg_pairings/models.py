@@ -1,3 +1,4 @@
+import math
 import typing
 from typing import List
 
@@ -71,7 +72,7 @@ class Performance:
         match_diff = self.match_wins - self.match_losses
         try:
             win_percentage = self.wins / (self.wins + self.losses)
-            return match_diff + win_percentage
+            return match_diff + min(win_percentage, 0.99)
         except ZeroDivisionError:
             return float(match_diff)
 
@@ -98,7 +99,10 @@ class Performance:
 
 def penalty(player_1: Performance, player_2: Performance) -> float:
     x, y = float(player_1), float(player_2)
-    return -abs(x-y)
+    if x == y == 0:
+        return 0
+
+    return -abs(x-y)/max(abs(x), abs(y))
 
 
 class Tournament(models.Model):
@@ -172,21 +176,44 @@ class Tournament(models.Model):
     @atomic
     def start_next_round(self) -> 'Round':
         """Creates and returns the objects for the next round."""
+        all_players = set(self.players.all())
+
+        win_graph = networkx.DiGraph()
+
+        for player in all_players:
+            weighted_edges = []
+            for duel in self.duels(player):
+                opponent = duel.opponent(player)
+                player_wins = duel.wins_of(player)
+                opponent_wins = duel.wins_of(opponent)
+
+                # calculate wins like this so 2:0 weighs more than 2:1
+                # for example:
+                # 3:0 -> 5, 3:1 -> 4, 3:2 -> 3, 2:3 -> 2, 1:3 -> 1, 0:3 -> 0
+                if player_wins == settings.MATCH_WINS_NEEDED:
+                    wins = settings.MATCH_WINS_NEEDED + (settings.MATCH_WINS_NEEDED - opponent_wins - 1)
+                else:
+                    wins = player_wins
+
+                weighted_edges.append((opponent, player, wins))
+
+            win_graph.add_weighted_edges_from(weighted_edges)
+
+        # try to avoid floating point errors when subtracting later by increasing magnitudes
+        ranking = {p: v * 100 for p, v in networkx.pagerank_numpy(win_graph).items()}
         graph = networkx.Graph()
-        all_players = set(self.players.values_list('name', flat=True))
-        current_standing = self.standing
-        for performance in current_standing:
-            player = performance.player
-            other_players = all_players - {player.name}
-            valid_opponents = other_players - set(self.opponents(player))
-            valid_opponent_performances = [standing for standing in current_standing if
-                                           standing.player.name in valid_opponents]
 
-            # needs min weight, so we negate the edge weight
-            weighted_edges = [(player, opponent.player, penalty(performance, opponent))
-                              for opponent in valid_opponent_performances]
-
-            graph.add_weighted_edges_from(weighted_edges)
+        for player in ranking:
+            valid_opponents = {
+                p
+                for p in all_players
+                if p.name not in (set(self.opponents(player)) | {player.name})
+           }
+            for opponent in valid_opponents:
+                weight = (ranking[player]**2 - ranking[opponent]**2) ** 2
+                graph.add_weighted_edges_from(
+                    [(player, opponent, -weight)]  # negative weight to create min matching.
+                )
 
         next_round = Round.objects.create(tournament=self, number=self.current_round.number + 1)
         matching = networkx.algorithms.matching.max_weight_matching(graph, maxcardinality=True)
@@ -194,7 +221,7 @@ class Tournament(models.Model):
         for player_1, player_2 in matching:
             assert player_2 not in self.opponents(player_1)
             assert player_1 not in self.opponents(player_2)
-            matched_players.update({player_1.name, player_2.name})
+            matched_players.update({player_1, player_2})
             Duel.objects.create(player_1=player_1, player_2=player_2, round=next_round)
 
         player_diff = all_players - matched_players
@@ -209,6 +236,7 @@ class Tournament(models.Model):
         aggregate = self.duels(player).aggregate(wins=models.Sum(
             models.Case(models.When(player_1=player, then='player_1_wins'),
                         models.When(player_2=player, then='player_2_wins'))))
+
         return aggregate['wins'] if aggregate['wins'] else 0
 
     def losses(self, player: Player) -> int:
