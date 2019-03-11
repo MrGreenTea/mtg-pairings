@@ -1,3 +1,4 @@
+import itertools
 import math
 import typing
 from typing import List
@@ -23,6 +24,12 @@ class Player(models.Model):
 
     def duels(self):
         return Duel.objects.filter(models.Q(player_1=self) | models.Q(player_2=self))
+
+    def duels_against(self, opponent: "Player"):
+        return Duel.objects.filter(
+            models.Q(player_1=self, player_2=opponent)
+            | models.Q(player_1=opponent, player_2=self)
+        )
 
     @property
     def all_time_performance(self) -> 'Performance':
@@ -97,12 +104,9 @@ class Performance:
             )
 
 
-def penalty(player_1: Performance, player_2: Performance) -> float:
-    x, y = float(player_1), float(player_2)
-    if x == y == 0:
-        return 0
-
-    return -abs(x-y)/max(abs(x), abs(y))
+def penalty(rank_1: float, rank_2: float) -> float:
+    # negative weight to create min matching.
+    return -((rank_1 ** 2 - rank_2 ** 2) ** 2)
 
 
 class Tournament(models.Model):
@@ -118,12 +122,10 @@ class Tournament(models.Model):
         return f'{self.name} on {self.date}'
 
     def duels(self, player: Player = None):
-        all_duels = Duel.objects.filter(round__tournament=self)
+        if player is not None:
+            return self.duels().filter(models.Q(player_1=player) | models.Q(player_2=player))
 
-        if player is None:
-            return all_duels
-
-        return all_duels.filter(models.Q(player_1=player) | models.Q(player_2=player))
+        return Duel.objects.filter(round__tournament=self)
 
     @property
     def standing(self) -> List[Performance]:
@@ -153,18 +155,23 @@ class Tournament(models.Model):
 
     @atomic
     def start_first_round(self) -> 'Round':
+        all_players = set(self.players.all())
+        win_graph = networkx.DiGraph()
+
+        for player in all_players:
+            win_graph.add_weighted_edges_from(
+                (duel.opponent(player), player, duel.wins_of(player))
+                for duel in player.duels()
+            )
+
+        ranking = {p: v * 100 for p, v in networkx.pagerank_numpy(win_graph).items()}
+
         graph = networkx.Graph()
 
-        # cache so they don't get recalculated every time
-        all_time_performances = {player: player.all_time_performance for player in self.players.all()}
-
-        for player, performance in all_time_performances.items():
-            weighted_edges = [
-                (player, opponent, penalty(performance, op_performance))
-                for opponent, op_performance in all_time_performances.items() if opponent != player
-            ]
-
-            graph.add_weighted_edges_from(weighted_edges)
+        graph.add_weighted_edges_from(
+            (player, opponent, penalty(ranking[player], ranking[opponent]))
+            for player, opponent in itertools.combinations(all_players, r=2)
+        )
 
         matching = networkx.algorithms.matching.max_weight_matching(graph, maxcardinality=True)
         next_round = Round.objects.create(tournament=self, number=1)
@@ -177,43 +184,33 @@ class Tournament(models.Model):
     def start_next_round(self) -> 'Round':
         """Creates and returns the objects for the next round."""
         all_players = set(self.players.all())
+        possible_matchings = set(map(frozenset, itertools.combinations(all_players, r=2)))
+        previous_duels = set(self.duels())
+        previous_matchings = set(
+            frozenset((duel.player_1, duel.player_2))
+            for duel in previous_duels
+        )
 
         win_graph = networkx.DiGraph()
+        weighted_edges = []
 
-        for player in all_players:
-            weighted_edges = []
-            for duel in self.duels(player):
-                opponent = duel.opponent(player)
-                player_wins = duel.wins_of(player)
-                opponent_wins = duel.wins_of(opponent)
+        for duel in previous_duels:
+            weighted_edges.extend([
+                (duel.player_2, duel.player_1, duel.player_1_wins),
+                (duel.player_1, duel.player_2, duel.player_2_wins)
+            ])
 
-                # calculate wins like this so 2:0 weighs more than 2:1
-                # for example:
-                # 3:0 -> 5, 3:1 -> 4, 3:2 -> 3, 2:3 -> 2, 1:3 -> 1, 0:3 -> 0
-                if player_wins == settings.MATCH_WINS_NEEDED:
-                    wins = settings.MATCH_WINS_NEEDED + (settings.MATCH_WINS_NEEDED - opponent_wins - 1)
-                else:
-                    wins = player_wins
-
-                weighted_edges.append((opponent, player, wins))
-
-            win_graph.add_weighted_edges_from(weighted_edges)
+        win_graph.add_weighted_edges_from(weighted_edges)
 
         # try to avoid floating point errors when subtracting later by increasing magnitudes
         ranking = {p: v * 100 for p, v in networkx.pagerank_numpy(win_graph).items()}
         graph = networkx.Graph()
 
-        for player in ranking:
-            valid_opponents = {
-                p
-                for p in all_players
-                if p.name not in (set(self.opponents(player)) | {player.name})
-           }
-            for opponent in valid_opponents:
-                weight = (ranking[player]**2 - ranking[opponent]**2) ** 2
-                graph.add_weighted_edges_from(
-                    [(player, opponent, -weight)]  # negative weight to create min matching.
-                )
+        graph.add_weighted_edges_from([
+            (player, opponent, penalty(ranking[player], ranking[opponent]))
+            for player, opponent in possible_matchings - previous_matchings
+         ]
+        )
 
         next_round = Round.objects.create(tournament=self, number=self.current_round.number + 1)
         matching = networkx.algorithms.matching.max_weight_matching(graph, maxcardinality=True)
