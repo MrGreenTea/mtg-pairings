@@ -1,7 +1,4 @@
-import os
-
-from hypothesis import given, strategies, assume, settings
-from hypothesis.extra.django import TestCase
+from hypothesis import given, strategies, reproduce_failure
 
 # Create your tests here.
 from . import models
@@ -15,17 +12,14 @@ def performances(**kwargs):
     return strategies.builds(models.Performance, **parameters)
 
 
-class TestModels(TestCase):
-    @settings(use_coverage=int(os.environ.get('HYPOTHESIS_USE_COVERAGE', 1)))
-    @given(performances(), performances(), strategies.integers(min_value=1))
-    def test_penalty(self, player_1: models.Performance, player_2: models.Performance,
-                     delta: int):
-        assume(player_1 > player_2)
-
-        player_3 = player_1 + models.Performance(player_1.player, delta, 0, 0, 0)
-        player_4 = player_2 + models.Performance(player_2.player, delta, 0, 0, 0)
-
-        assert models.penalty(player_3, player_4) > models.penalty(player_1, player_2)
+@reproduce_failure('4.9.0', b'AXicY2BAAUwIJgAAMAAD')
+@given(performances(), performances())
+def test_penalty(player_1: models.Performance, player_2: models.Performance):
+    penalty: float = models.penalty(player_1, player_2)
+    if player_1 == player_2:
+        assert penalty == 0
+    else:
+        assert penalty < 0
 
 
 @given(performances(), performances())

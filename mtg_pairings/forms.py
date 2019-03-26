@@ -21,20 +21,29 @@ class RoundForm(forms.Form):
 
         self.helper.add_input(layout.Submit('submit', 'Submit'))
         layout_rows = []
+        free_win = None
         for i, duel in enumerate(round.duels.all()):
             player_1, player_2 = f'duel-{i}-player1', f'duel-{i}-player2'
 
-            layout_rows.append(layout.Row(player_1, player_2))
+            if models.Player.FREEWIN in duel.players:
+                disabled = True
+                free_win = layout.Row(player_1, player_2)
+            else:
+                disabled = False
+                layout_rows.append(layout.Row(player_1, player_2))
 
             self.fields[player_1] = forms.IntegerField(initial=duel.player_1_wins, min_value=0,
                                                        max_value=settings.MATCH_WINS_NEEDED,
-                                                       label=duel.player_1.name)
+                                                       label=duel.player_1.name, disabled=disabled)
             self.fields[player_2] = forms.IntegerField(initial=duel.player_2_wins, min_value=0,
                                                        max_value=settings.MATCH_WINS_NEEDED,
-                                                       label=duel.player_2.name)
+                                                       label=duel.player_2.name, disabled=disabled)
+
+        if free_win is not None:
+            layout_rows.append(free_win)
 
         self.helper.layout = layout.Layout(
-            *layout_rows
+            *layout_rows,
         )
 
     def clean(self):

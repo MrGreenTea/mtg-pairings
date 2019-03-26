@@ -14,6 +14,5 @@ class MtgPairingsConfig(AppConfig):
     @staticmethod
     def init_freewin_player(sender, **kwargs):
         if hasattr(sender, "FREEWIN"):
-            print(sender, "FREEWIN set")
             sender.FREEWIN, created = sender.objects.get_or_create(name="FREE WIN")
-            print("Created: ", created)
+            print(sender, "FREEWIN created:", created)
