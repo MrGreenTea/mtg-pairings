@@ -110,7 +110,7 @@ class Performance:
             return 0.0
 
     def __float__(self):
-        return self.match_win_percentage * (self.win_percentage ** 2)
+        return self.match_win_percentage * 100 + self.win_percentage
 
     def __add__(self, other):
         if isinstance(other, self.__class__):
@@ -174,13 +174,13 @@ def penalty(rank_1: float, rank_2: float) -> float:
 
 
 def ranking(duels, players, **kwargs):
+    player_mapping = {
+        player.name: player for player in players
+    }
+
     all_players = set(players) - {Player.FREEWIN}  # don't count free wins
     win_graph = networkx.DiGraph()
     win_graph.add_nodes_from(all_players)
-
-    player_mapping = {
-        player.name: player for player in all_players
-    }
 
     duels = duels.values("player_1", "player_1_wins", "player_2", "player_2_wins")
     for duel in duels:
@@ -282,10 +282,12 @@ class Tournament(models.Model):
             perf.player: float(perf) for perf in self.standing
         }
         player_ranking = ranking(
-            duels=previous_duels,
+            duels=Duel.without_freewins(previous_duels),
             players=all_players,
             personalization=personalization
         )
+
+        player_ranking.setdefault(Player.FREEWIN, -10)
 
         graph = networkx.Graph()
 
@@ -391,8 +393,11 @@ class Duel(models.Model):
     player_2_wins = models.PositiveSmallIntegerField(default=0)
 
     @classmethod
-    def without_freewins(cls):
-        return cls.objects.exclude(
+    def without_freewins(cls, from_duels=None):
+        if from_duels is None:
+            from_duels = cls.objects
+
+        return from_duels.exclude(
             models.Q(player_1=Player.FREEWIN) | models.Q(player_2=Player.FREEWIN)
         )
 
