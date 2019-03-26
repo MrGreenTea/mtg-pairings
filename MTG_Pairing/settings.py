@@ -14,6 +14,9 @@ import os
 import environ
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENV = environ.Env()
 
@@ -27,6 +30,18 @@ SECRET_KEY = ENV('DJANGO_SECRET_KEY')
 DEBUG = ENV.bool('DJANGO_DEBUG', default=False)
 
 ALLOWED_HOSTS = ENV.list('DJANGO_ALLOWED_HOSTS')
+ENVIRONMENT = ENV("ENVIRONMENT", default="DEV")
+
+SENTRY_DSN = ENV("SENTRY_DSN")
+
+
+sentry_sdk.init(
+    dsn=SENTRY_DSN,
+    integrations=[DjangoIntegration()],
+    environment=ENVIRONMENT,
+    debug=DEBUG
+)
+
 
 
 # Application definition
