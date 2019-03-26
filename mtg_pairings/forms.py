@@ -2,6 +2,7 @@ import re
 
 import crispy_forms.helper
 from crispy_forms import layout
+from dal import autocomplete
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -79,5 +80,18 @@ class RoundForm(forms.Form):
                        models.Performance(player_2, wins=player_2_result, losses=value, match_wins=0, match_losses=0))
 
 
-class TournamentForm(forms.Form):
+class TournamentForm(forms.ModelForm):
+    class Meta:
+        model = models.Tournament
+        fields = ["name", "players"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = crispy_forms.helper.FormHelper()
+        self.helper.add_input(layout.Submit('submit', 'Submit'))
+
     name = forms.CharField(required=True)
+    players = forms.ModelMultipleChoiceField(
+        queryset=models.Player.objects.exclude(name=models.Player.FREEWIN),
+        widget=autocomplete.ModelSelect2Multiple(url="player-autocomplete"),
+    )
