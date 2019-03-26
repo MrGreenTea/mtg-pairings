@@ -77,3 +77,7 @@ class RoundForm(forms.Form):
                 player_2_result = self.cleaned_data[player_2_id]
                 yield (models.Performance(player_1, wins=value, losses=player_2_result, match_wins=0, match_losses=0),
                        models.Performance(player_2, wins=player_2_result, losses=value, match_wins=0, match_losses=0))
+
+
+class TournamentForm(forms.Form):
+    name = forms.CharField(required=True)

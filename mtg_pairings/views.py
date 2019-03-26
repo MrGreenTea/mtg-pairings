@@ -21,6 +21,15 @@ class ListTournaments(LoginRequiredMixin, generic.ListView):
         return context
 
 
+class CreateTournament(LoginRequiredMixin, generic.CreateView):
+    model = models.Tournament
+    template_name = "tournament_form.html"
+    fields = ["name", "players"]
+
+    def post(self, request, *args, **kwargs):
+        return super(CreateTournament, self).post(request, *args, **kwargs)
+
+
 class ShowTournament(LoginRequiredMixin, generic.DetailView):
     model = models.Tournament
     template_name = 'view_tournament.html'
@@ -68,7 +77,14 @@ class ListPlayers(LoginRequiredMixin, generic.ListView):
     template_name = 'player_list.html'
 
     def get_queryset(self):
-        return self.model.all_time_standing
+        return self.model.all_time_standing()
+
+    def get_context_data(self, *, object_list=None, **kwargs):
+        context = super(ListPlayers, self).get_context_data()
+        context.setdefault(
+            "pageranking", self.model.all_time_ranking()
+        )
+        return context
 
 
 class ShowPlayer(LoginRequiredMixin, generic.DetailView):

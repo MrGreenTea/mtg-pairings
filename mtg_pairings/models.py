@@ -24,8 +24,11 @@ class Player(models.Model):
     def get_absolute_url(self):
         return reverse('player_detail', args=[self.name])
 
-    def duels(self):
-        return Duel.objects.filter(models.Q(player_1=self) | models.Q(player_2=self))
+    def duels(self, from_duels=None):
+        if from_duels is None:
+            from_duels = Duel.objects
+
+        return from_duels.filter(models.Q(player_1=self) | models.Q(player_2=self))
 
     def duels_against(self, opponent: "Player"):
         return Duel.objects.filter(
@@ -35,7 +38,7 @@ class Player(models.Model):
 
     @property
     def all_time_performance(self) -> 'Performance':
-        duels = self.duels().exclude(models.Q(player_1=self.FREEWIN) | models.Q(player_2=self.FREEWIN))
+        duels = self.duels(Duel.without_freewins())
 
         returned_standing = standing(duels, [self])
         assert len(returned_standing) == 1, f"Standing contains for players than {self}"
@@ -43,18 +46,27 @@ class Player(models.Model):
         return returned_standing[0]
 
     @classmethod
-    def all_time_standing(cls):
-        duels = Duel.objects.exclude(
-            models.Q(player_1=cls.FREEWIN) | models.Q(player_2=cls.FREEWIN)
-        ).select_related("round__tournament__players")
+    def all_time_standing(cls, duels=None, players=None):
+        if duels is None:
+            duels = Duel.without_freewins().select_related("round__tournament__players")
+
+        if players is None:
+            players = duels.values_list("player_1", flat=True).union(duels.values_list("player_2", flat=True))
+            players = Player.objects.filter(name__in=players)
+
+        return standing(duels, players)
+
+    @classmethod
+    def all_time_ranking(cls):
+        duels = Duel.without_freewins().select_related("round__tournament__players")
 
         players = duels.values_list("player_1", flat=True).union(duels.values_list("player_2", flat=True))
         players = Player.objects.filter(name__in=players)
 
-        calculated_standing = standing(duels, players)
+        calculated_standing = cls.all_time_standing(duels=duels, players=players)
         pageranking = ranking(duels, players)
 
-        return sorted(calculated_standing, key=lambda k: pageranking[k], reverse=True)
+        return sorted(calculated_standing, key=lambda k: pageranking[k.player], reverse=True)
 
 
 @attr.s(cmp=False)
@@ -84,14 +96,14 @@ class Performance:
         try:
             return self.wins / (self.wins + self.losses)
         except ZeroDivisionError:
-            return 0
+            return 0.0
 
     @property
     def match_win_percentage(self):
         try:
             return self.match_wins / (self.match_wins + self.match_losses)
         except ZeroDivisionError:
-            return 0
+            return 0.0
 
     def __float__(self):
         return self.match_win_percentage * (self.win_percentage ** 2)
@@ -162,9 +174,19 @@ def ranking(duels, players, **kwargs):
     win_graph = networkx.DiGraph()
     win_graph.add_nodes_from(all_players)
 
+    player_mapping = {
+        player.name: player for player in all_players
+    }
+
+    duels = duels.values("player_1", "player_1_wins", "player_2", "player_2_wins")
+    for duel in duels:
+        duel["player_1"] = player_mapping[duel["player_1"]]
+        duel["player_2"] = player_mapping[duel["player_2"]]
+
     win_graph.add_weighted_edges_from(
         itertools.chain.from_iterable(
-            ((duel.player_1, duel.player_2, duel.player_2_wins), (duel.player_2, duel.player_1, duel.player_1_wins))
+            ((duel["player_1"], duel["player_2"], duel["player_2_wins"]),
+             (duel["player_2"], duel["player_1"], duel["player_1_wins"]))
             for duel in duels
         )
     )
@@ -215,7 +237,7 @@ class Tournament(models.Model):
     def start_first_round(self) -> 'Round':
         all_players = set(self.players.all()) - {Player.FREEWIN}  # don't count free wins
 
-        player_ranking = ranking(duels=Duel.objects.all(), players=all_players)
+        player_ranking = ranking(duels=Duel.without_freewins(), players=all_players)
 
         graph = networkx.Graph()
 
@@ -246,7 +268,7 @@ class Tournament(models.Model):
         """Creates and returns the objects for the next round."""
         all_players = set(self.players.all())
         possible_matchings = set(map(frozenset, itertools.combinations(all_players, r=2)))
-        previous_duels = set(self.duels())
+        previous_duels = self.duels().distinct()
         previous_matchings = set(
             frozenset((duel.player_1, duel.player_2))
             for duel in previous_duels
@@ -363,6 +385,12 @@ class Duel(models.Model):
 
     player_1_wins = models.PositiveSmallIntegerField(default=0)
     player_2_wins = models.PositiveSmallIntegerField(default=0)
+
+    @classmethod
+    def without_freewins(cls):
+        return cls.objects.exclude(
+            models.Q(player_1=Player.FREEWIN) | models.Q(player_2=Player.FREEWIN)
+        )
 
     def set_player_performance(self, performance: Performance):
         if performance.player not in (self.player_1, self.player_2):

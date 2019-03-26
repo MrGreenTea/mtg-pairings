@@ -2,30 +2,74 @@
 
 
 {% block body %}
-    <table class="table table-sm table-hover">
-            <thead class="thead-dark">
-            <tr>
-                <th scope="col">#</th>
-                <th scope="col">Name</th>
-                <th class="text-right" scope="col">Matches</th>
-                <th class="text-right" scope="col">Games</th>
-                <th class="text-right" scope="col">Match Win Rate</th>
-                <th class="text-right" scope="col">Game Win Rate</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for performance in object_list %}
-                <tr {% if forloop.counter <= 3 %}class="player-row-{{ forloop.counter }}" {% endif %}>
-                    <th scope="row">{% if forloop.counter <= 3 %}{{ forloop.counter }} {% endif %}</th>
-                    <td style="width: 80%">
-                        <a class="text-secondary" href="{{ performance.player.get_absolute_url }}"> {{ performance.player }} </a>
-                    </td>
-                    <td class="text-right">{{ performance.match_wins }} : {{ performance.match_losses }}</td>
-                    <td class="text-right">{{ performance.wins }} : {{ performance.losses }}</td>
-                    <td class="text-right">{% widthratio performance.match_win_percentage 1 100 %}% </td>
-                    <td class="text-right">{% widthratio performance.win_percentage 1 100 %}% </td>
+    <ul class="nav nav-tabs" id="myTab" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" id="home-tab" data-toggle="tab" href="#home" role="tab" aria-controls="home"
+               aria-selected="true">Standing</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="profile-tab" data-toggle="tab" href="#profile" role="tab" aria-controls="profile"
+               aria-selected="false">Pagerank</a>
+        </li>
+    </ul>
+    <div class="tab-content" id="myTabContent">
+        <div class="tab-pane fade show active" id="home" role="tabpanel" aria-labelledby="home-tab">
+            <table class="table table-sm table-hover">
+                <thead class="thead-dark">
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Name</th>
+                    <th class="text-right" scope="col">Matches</th>
+                    <th class="text-right" scope="col">Games</th>
+                    <th class="text-right" scope="col">Match Win Rate</th>
+                    <th class="text-right" scope="col">Game Win Rate</th>
                 </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                {% for performance in object_list %}
+                    <tr {% if forloop.counter <= 3 %}class="player-row-{{ forloop.counter }}" {% endif %}>
+                        <th scope="row">{% if forloop.counter <= 3 %}{{ forloop.counter }} {% endif %}</th>
+                        <td style="width: 80%">
+                            <a class="text-secondary"
+                               href="{{ performance.player.get_absolute_url }}"> {{ performance.player }} </a>
+                        </td>
+                        <td class="text-right">{{ performance.match_wins }} : {{ performance.match_losses }}</td>
+                        <td class="text-right">{{ performance.wins }} : {{ performance.losses }}</td>
+                        <td class="text-right">{% widthratio performance.match_win_percentage 1 100 %}%</td>
+                        <td class="text-right">{% widthratio performance.win_percentage 1 100 %}%</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
+            <table class="table table-sm table-hover">
+                <thead class="thead-dark">
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Name</th>
+                    <th class="text-right" scope="col">Matches</th>
+                    <th class="text-right" scope="col">Games</th>
+                    <th class="text-right" scope="col">Match Win Rate</th>
+                    <th class="text-right" scope="col">Game Win Rate</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for performance in pageranking %}
+                    <tr {% if forloop.counter <= 3 %}class="player-row-{{ forloop.counter }}" {% endif %}>
+                        <th scope="row">{% if forloop.counter <= 3 %}{{ forloop.counter }} {% endif %}</th>
+                        <td style="width: 80%">
+                            <a class="text-secondary"
+                               href="{{ performance.player.get_absolute_url }}"> {{ performance.player }} </a>
+                        </td>
+                        <td class="text-right">{{ performance.match_wins }} : {{ performance.match_losses }}</td>
+                        <td class="text-right">{{ performance.wins }} : {{ performance.losses }}</td>
+                        <td class="text-right">{% widthratio performance.match_win_percentage 1 100 %}%</td>
+                        <td class="text-right">{% widthratio performance.win_percentage 1 100 %}%</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 {% endblock body %}
