@@ -21,6 +21,10 @@ class Player(models.Model):
     def __str__(self):
         return self.name
 
+    @classmethod
+    def without_freewin(cls):
+        return cls.objects.exclude(name=cls.FREEWIN.name)
+
     def get_absolute_url(self):
         return reverse('player_detail', args=[self.name])
 
@@ -214,7 +218,7 @@ class Tournament(models.Model):
 
     @property
     def standing(self) -> List[Performance]:
-        players = self.players.all()
+        players = self.players.exclude(name=Player.FREEWIN)
 
         if not self.rounds.exists():
             return [Performance(player, 0, 0, 0, 0) for player in players]
@@ -237,7 +241,7 @@ class Tournament(models.Model):
     def start_first_round(self) -> 'Round':
         all_players = set(self.players.all()) - {Player.FREEWIN}  # don't count free wins
 
-        player_ranking = ranking(duels=Duel.without_freewins(), players=all_players)
+        player_ranking = ranking(duels=Duel.without_freewins(), players=Player.without_freewin())
 
         graph = networkx.Graph()
 

@@ -1,3 +1,4 @@
+from dal import autocomplete
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.transaction import atomic
@@ -24,10 +25,7 @@ class ListTournaments(LoginRequiredMixin, generic.ListView):
 class CreateTournament(LoginRequiredMixin, generic.CreateView):
     model = models.Tournament
     template_name = "tournament_form.html"
-    fields = ["name", "players"]
-
-    def post(self, request, *args, **kwargs):
-        return super(CreateTournament, self).post(request, *args, **kwargs)
+    form_class = forms.TournamentForm
 
 
 class ShowTournament(LoginRequiredMixin, generic.DetailView):
@@ -90,3 +88,17 @@ class ListPlayers(LoginRequiredMixin, generic.ListView):
 class ShowPlayer(LoginRequiredMixin, generic.DetailView):
     model = models.Player
     template_name = 'player_detail.html'
+
+
+class PlayerAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        # Don't forget to filter out results depending on the visitor !
+        if not self.request.user.is_authenticated:
+            return models.Player.objects.none()
+
+        qs = models.Player.without_freewin()
+
+        if self.q:
+            qs = qs.filter(name__istartswith=self.q)
+
+        return qs
