@@ -67,6 +67,9 @@ class ListPlayers(LoginRequiredMixin, generic.ListView):
     model = models.Player
     template_name = 'player_list.html'
 
+    def get_queryset(self):
+        return self.model.all_time_standing
+
 
 class ShowPlayer(LoginRequiredMixin, generic.DetailView):
     model = models.Player
