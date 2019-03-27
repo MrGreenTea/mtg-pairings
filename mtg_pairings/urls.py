@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     path('', views.ListTournaments.as_view(), name='tournament_list'),
     path('start', views.CreateTournament.as_view(), name='create_tournament'),
+    path('accounts/profile/', views.ProfilePlayer.as_view(), name="profile"),
     path('players/', views.ListPlayers.as_view(), name='player_list'),
     path('players/autocomplete', views.PlayerAutocomplete.as_view(create_field='name'), name="player-autocomplete"),
     path('players/<str:pk>', views.ShowPlayer.as_view(), name='player_detail'),

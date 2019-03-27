@@ -26,7 +26,8 @@ class RoundForm(forms.Form):
         for i, duel in enumerate(round.duels.all()):
             player_1, player_2 = f'duel-{i}-player1', f'duel-{i}-player2'
 
-            if models.Player.FREEWIN in duel.players:
+            freewin = models.Player.FREEWIN()
+            if freewin in duel.players:
                 disabled = True
                 free_win = layout.Row(player_1, player_2)
             else:
@@ -48,23 +49,24 @@ class RoundForm(forms.Form):
         )
 
     def clean(self):
-        cleaned_data = super().clean()
+        cleaned_data = super().clean().copy()
 
-        errors = {}
         for name, value in cleaned_data.items():
-
             match = PATTERN.match(name)
             if match:
                 player_2_id = f'duel-{match.group(1)}-player2'
                 if value < settings.MATCH_WINS_NEEDED and cleaned_data[player_2_id] < settings.MATCH_WINS_NEEDED:
-                    errors[name] = f'Either player needs {settings.MATCH_WINS_NEEDED} wins.'
-                    errors[player_2_id] = ''
+                    self.add_error(
+                        name, f'Either player needs {settings.MATCH_WINS_NEEDED} wins.'
+                    )
+                    self.add_error(
+                        player_2_id, ""
+                    )
                 elif value == cleaned_data[player_2_id]:
-                    errors[name] = f'Only one player can have {settings.MATCH_WINS_NEEDED} wins.'
-                    errors[player_2_id] = ''
-
-        if errors:
-            raise ValidationError(errors)
+                    self.add_error(
+                        name, f'Only one player can have {settings.MATCH_WINS_NEEDED} wins.'
+                    )
+                    self.add_error(player_2_id, "")
 
         return cleaned_data
 
@@ -91,7 +93,8 @@ class TournamentForm(forms.ModelForm):
         self.helper.add_input(layout.Submit('submit', 'Submit'))
 
     name = forms.CharField(required=True)
+    freewin = models.Player.FREEWIN()
     players = forms.ModelMultipleChoiceField(
-        queryset=models.Player.objects.exclude(name=models.Player.FREEWIN),
+        queryset=models.Player.objects.exclude(name=freewin),
         widget=autocomplete.ModelSelect2Multiple(url="player-autocomplete"),
     )

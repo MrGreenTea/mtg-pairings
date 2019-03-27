@@ -68,7 +68,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'MTG_Pairing.urls'
+ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
     {

@@ -13,19 +13,26 @@ from django.db import models
 from django.db.transaction import atomic
 from django.dispatch import receiver
 from django.urls import reverse
+from django.contrib.auth.models import User
 
 
 class Player(models.Model):
     name = models.CharField(max_length=256, primary_key=True)
-
-    FREEWIN: "Player" = None
+    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True)
+    _FREEWIN: "Player" = None
 
     def __str__(self):
         return self.name
 
     @classmethod
+    def FREEWIN(cls) -> "Player":
+        if cls._FREEWIN is not None:
+            return cls._FREEWIN
+        cls._FREEWIN, created = cls.objects.get_or_create(name="FREE WIN")
+
+    @classmethod
     def without_freewin(cls):
-        return cls.objects.exclude(name=cls.FREEWIN.name)
+        return cls.objects.exclude(name=cls.FREEWIN().name)
 
     def get_absolute_url(self):
         return reverse('player_detail', args=[self.name])
@@ -164,6 +171,9 @@ def standing(duels, players) -> List[Performance]:
                                           models.When(player_2=player, then='player_1_wins')))
         )
 
+        for key in ["wins", "losses"]:  # if querysets are empty, sum will return None. We want 0 instead.
+            aggregate[key] = 0 if aggregate[key] is None else aggregate[key]
+
         performance = Performance(player, **aggregate)
         bisect.insort_right(
             player_standings,
@@ -183,7 +193,8 @@ def ranking(duels, players, draw=False, **kwargs) -> typing.Tuple[typing.Dict[Pl
         player.name: player for player in players
     }
 
-    all_players = set(players) - {Player.FREEWIN}  # don't count free wins
+    freewin = Player.FREEWIN()
+    all_players = set(players) - {freewin}  # don't count free wins
     win_graph = networkx.DiGraph()
     win_graph.add_nodes_from(all_players)
 
@@ -219,14 +230,16 @@ def ranking(duels, players, draw=False, **kwargs) -> typing.Tuple[typing.Dict[Pl
         max_wins = max(d["weight"] for (u, v, d) in win_graph.edges(data=True))
         color_values = [
             colors.to_hex(
-                colors.hsv_to_rgb((ratio*0.8 + 0.1, 0.9, (ratio+1)/2))
+                colors.hsv_to_rgb((ratio * 0.8 + 0.1, 0.9, (ratio + 1) / 2))
             )
-            for ratio in map(lambda w: w/max_wins, range(1, max_wins+1))
+            for ratio in map(lambda w: w / max_wins, range(1, max_wins + 1))
         ]
         legend = []
 
-        winner_edges = [(v, u, d) for (u, v, d) in win_graph.edges(data=True) if d["weight"] > win_graph[v][u]["weight"]]
-        loser_edges = [(v, u, d) for (u, v, d) in win_graph.edges(data=True) if d["weight"] <= win_graph[v][u]["weight"]]
+        winner_edges = [(v, u, d) for (u, v, d) in win_graph.edges(data=True) if
+                        d["weight"] > win_graph[v][u]["weight"]]
+        loser_edges = [(v, u, d) for (u, v, d) in win_graph.edges(data=True) if
+                       d["weight"] <= win_graph[v][u]["weight"]]
 
         # we want to overlay bigger wins with smaller ones
         for wins, color in reversed(list(enumerate(color_values, start=1))):
@@ -271,7 +284,7 @@ class Tournament(models.Model):
 
     @property
     def standing(self) -> List[Performance]:
-        players = self.players.exclude(name=Player.FREEWIN)
+        players = self.players.exclude(name=Player.FREEWIN())
 
         if not self.rounds.exists():
             return [Performance(player, 0, 0, 0, 0) for player in players]
@@ -292,7 +305,8 @@ class Tournament(models.Model):
 
     @atomic
     def start_first_round(self) -> 'Round':
-        all_players = set(self.players.all()) - {Player.FREEWIN}  # don't count free wins
+        freewin = Player.FREEWIN()
+        all_players = set(self.players.all()) - {freewin}  # don't count free wins
 
         player_ranking, _ = ranking(duels=Duel.without_freewins(), players=Player.without_freewin())
 
@@ -315,7 +329,7 @@ class Tournament(models.Model):
         if not_matched_players:
             assert len(not_matched_players) == 1, "Something went wrong when matching up"
             last_player = next(iter(not_matched_players))
-            Duel.objects.create(round=next_round, player_1=last_player, player_2=Player.FREEWIN,
+            Duel.objects.create(round=next_round, player_1=last_player, player_2=freewin,
                                 player_1_wins=settings.MATCH_WINS_NEEDED)
 
         return next_round
@@ -340,7 +354,8 @@ class Tournament(models.Model):
             personalization=personalization
         )
 
-        player_ranking.setdefault(Player.FREEWIN, -10)
+        freewin = Player.FREEWIN()
+        player_ranking.setdefault(freewin, -10)
 
         graph = networkx.Graph()
 
@@ -357,10 +372,10 @@ class Tournament(models.Model):
             assert player_2 not in self.opponents(player_1)
             assert player_1 not in self.opponents(player_2)
             matched_players.update({player_1, player_2})
-            if Player.FREEWIN == player_1:
+            if freewin == player_1:
                 player_1, player_2 = player_2, player_1
                 player_1_wins = settings.MATCH_WINS_NEEDED
-            elif Player.FREEWIN == player_2:
+            elif freewin == player_2:
                 player_1_wins = settings.MATCH_WINS_NEEDED
             else:
                 player_1_wins = 0
@@ -450,8 +465,9 @@ class Duel(models.Model):
         if from_duels is None:
             from_duels = cls.objects
 
+        freewin = Player.FREEWIN()
         return from_duels.exclude(
-            models.Q(player_1=Player.FREEWIN) | models.Q(player_2=Player.FREEWIN)
+            models.Q(player_1=freewin) | models.Q(player_2=freewin)
         )
 
     def set_player_performance(self, performance: Performance):
@@ -527,11 +543,21 @@ def assure_players(sender, instance: Tournament, action, **kwargs):
     if instance.players.count() < 2:
         raise ValidationError('A tournament needs at least 2 players.')
     if instance.players.count() % 2:
-        assert Player.FREEWIN is not None, "Player.FREEWIN not set!"
-        if Player.FREEWIN in instance.players.all():
-            raise ValidationError(f"Remove the {Player.FREEWIN} player.")
+        freewin = Player.FREEWIN()
+        assert freewin is not None, "Player.FREEWIN not set!"
+        if freewin in instance.players.all():
+            raise ValidationError(f"Remove the {freewin} player.")
 
-        instance.players.add(Player.FREEWIN)
+        instance.players.add(freewin)
         instance.save()
     if not instance.rounds.exists():
         instance.start_first_round()
+
+
+@receiver(models.signals.post_save, sender=User)
+def connect_user_and_player(sender, instance: User, created: bool, **kwargs):
+    if created:
+        player, _ = Player.objects.get_or_create(name=instance.username)
+        assert player.user is None, "A Player with the same name was already connected to another User. This is a gross error"
+        player.user = instance
+        player.save()
