@@ -12,9 +12,19 @@
     </p>
 
     <ul>
-        {% for tournament in object.tournaments.all %}
+        {% for tournament, duels in tournaments.items %}
+
             <li>
                 <a href="{{ tournament.get_absolute_url }}"> {{ tournament }} </a>
+                {% if tournament.finished %}
+                    <ol>
+                        {% for duel in duels %}
+                        <li>{{ duel.wins }}:{{ duel.losses }} vs {{ duel.opponent }}</li>
+                        {% endfor %}
+                    </ol>
+                {% else %}
+                    (still playing)
+                {% endif %}
             </li>
         {% endfor %}
     </ul>

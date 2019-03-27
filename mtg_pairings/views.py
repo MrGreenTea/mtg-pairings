@@ -89,6 +89,19 @@ class ShowPlayer(LoginRequiredMixin, generic.DetailView):
     model = models.Player
     template_name = 'player_detail.html'
 
+    def get_context_data(self, **kwargs):
+        context = super(ShowPlayer, self).get_context_data(**kwargs)
+        context.setdefault(
+            "tournaments", {
+                tournament: [
+                    {"opponent": duel.opponent(self.object), "wins": duel.wins_of(self.object), "losses": duel.losses_of(self.object)}
+                    for duel in tournament.duels(self.object)
+                             ]
+                for tournament in self.object.tournaments.all()
+            }
+        )
+        return context
+
 
 class PlayerAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
