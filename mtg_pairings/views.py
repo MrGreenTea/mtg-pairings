@@ -78,9 +78,14 @@ class ListPlayers(LoginRequiredMixin, generic.ListView):
         return self.model.all_time_standing()
 
     def get_context_data(self, *, object_list=None, **kwargs):
+        draw = self.request.GET.get("draw", "false").lower() == "true"
         context = super(ListPlayers, self).get_context_data()
+        all_time_ranking = self.model.all_time_ranking(draw=draw)
         context.setdefault(
-            "pageranking", self.model.all_time_ranking()
+            "pageranking", all_time_ranking["ranking"]
+        )
+        context.setdefault(
+            "graph", all_time_ranking["graph"].decode("utf8")
         )
         return context
 

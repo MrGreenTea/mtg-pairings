@@ -1,4 +1,6 @@
+import base64
 import bisect
+import collections
 import itertools
 import typing
 from typing import List
@@ -61,16 +63,19 @@ class Player(models.Model):
         return standing(duels, players)
 
     @classmethod
-    def all_time_ranking(cls):
+    def all_time_ranking(cls, draw=False):
         duels = Duel.without_freewins().select_related("round__tournament__players")
 
         players = duels.values_list("player_1", flat=True).union(duels.values_list("player_2", flat=True))
         players = Player.objects.filter(name__in=players)
 
         calculated_standing = cls.all_time_standing(duels=duels, players=players)
-        pageranking = ranking(duels, players)
+        pageranking, visualization = ranking(duels, players, draw=draw)
 
-        return sorted(calculated_standing, key=lambda k: pageranking[k.player], reverse=True)
+        return {
+            "ranking": sorted(calculated_standing, key=lambda k: pageranking[k.player], reverse=True),
+            "graph": visualization
+        }
 
 
 @attr.s(cmp=False)
@@ -173,7 +178,7 @@ def penalty(rank_1: float, rank_2: float) -> float:
     return -((rank_1 ** 2 - rank_2 ** 2) ** 2)
 
 
-def ranking(duels, players, **kwargs):
+def ranking(duels, players, draw=False, **kwargs) -> typing.Tuple[typing.Dict[Player, float], typing.ByteString]:
     player_mapping = {
         player.name: player for player in players
     }
@@ -182,20 +187,66 @@ def ranking(duels, players, **kwargs):
     win_graph = networkx.DiGraph()
     win_graph.add_nodes_from(all_players)
 
-    duels = duels.values("player_1", "player_1_wins", "player_2", "player_2_wins")
+    duels = duels.filter(  # only duels that contain any wins make sense for ranking
+        models.Q(player_1_wins__gt=0) | models.Q(player_2_wins__gt=0)
+    ).values("player_1", "player_1_wins", "player_2", "player_2_wins")
+
+    winning_map = {
+        player: collections.defaultdict(int) for player in players
+    }
+
     for duel in duels:
-        duel["player_1"] = player_mapping[duel["player_1"]]
-        duel["player_2"] = player_mapping[duel["player_2"]]
+        player_1 = player_mapping[duel["player_1"]]
+        player_2 = player_mapping[duel["player_2"]]
+        winning_map[player_1][player_2] += duel["player_1_wins"]
+        winning_map[player_2][player_1] += duel["player_2_wins"]
 
-    win_graph.add_weighted_edges_from(
-        itertools.chain.from_iterable(
-            ((duel["player_1"], duel["player_2"], duel["player_2_wins"]),
-             (duel["player_2"], duel["player_1"], duel["player_1_wins"]))
-            for duel in duels
-        )
-    )
+    for player, wins_against in winning_map.items():
+        win_graph.add_weighted_edges_from((opponent, player, wins_against[opponent]) for opponent in wins_against)
 
-    return {p: v * 100 for p, v in networkx.pagerank_numpy(win_graph, **kwargs).items()}
+    pageranking = {p: v * 100 for p, v in networkx.pagerank_numpy(win_graph, **kwargs).items()}
+
+    if draw:
+        import io
+        import matplotlib.pyplot as plt
+        from matplotlib.lines import Line2D
+        from matplotlib import colors
+
+        plt.figure(figsize=(16, 9))
+
+        pos = networkx.shell_layout(win_graph)
+        networkx.draw_networkx_nodes(win_graph, pos, node_size=700)
+        max_wins = max(d["weight"] for (u, v, d) in win_graph.edges(data=True))
+        color_values = [
+            colors.to_hex(colors.hsv_to_rgb((ratio, 0.9, (ratio+1)/2)))
+            for ratio in map(lambda w: w/max_wins, range(1, max_wins+1))
+        ]
+        legend = []
+
+        winner_edges = [(v, u, d) for (u, v, d) in win_graph.edges(data=True) if d["weight"] > win_graph[v][u]["weight"]]
+        loser_edges = [(v, u, d) for (u, v, d) in win_graph.edges(data=True) if d["weight"] <= win_graph[v][u]["weight"]]
+
+        # we want to overlay bigger wins with smaller ones
+        for wins, color in reversed(list(enumerate(color_values, start=1))):
+            # we switch directions of edges so they show to winning against.
+            # pagerank wants the direction towards the winner to show "significance"
+            w_edges = [(v, u) for (u, v, d) in winner_edges if d["weight"] == wins]
+            networkx.draw_networkx_edges(win_graph, pos, edgelist=w_edges, width=5, edge_color=color, arrowstyle="-|>")
+            l_edges = [(v, u) for (u, v, d) in loser_edges if d["weight"] == wins]
+            networkx.draw_networkx_edges(win_graph, pos, edgelist=l_edges, width=2, edge_color=color, arrowstyle="-|>")
+
+            legend.append(Line2D([0], [0], marker='o', color='w', label=f'{wins}', markerfacecolor=color, markersize=6))
+
+        networkx.draw_networkx_labels(win_graph, pos, font_size=10)
+
+        plt.legend(handles=legend)
+
+        bytes_io = io.BytesIO()
+        plt.savefig(bytes_io, format="png")
+        bytes_io.seek(0)
+        return pageranking, base64.b64encode(bytes_io.read())
+
+    return pageranking, b""
 
 
 class Tournament(models.Model):
@@ -241,7 +292,7 @@ class Tournament(models.Model):
     def start_first_round(self) -> 'Round':
         all_players = set(self.players.all()) - {Player.FREEWIN}  # don't count free wins
 
-        player_ranking = ranking(duels=Duel.without_freewins(), players=Player.without_freewin())
+        player_ranking, _ = ranking(duels=Duel.without_freewins(), players=Player.without_freewin())
 
         graph = networkx.Graph()
 
@@ -281,7 +332,7 @@ class Tournament(models.Model):
         personalization = {
             perf.player: float(perf) for perf in self.standing
         }
-        player_ranking = ranking(
+        player_ranking, _ = ranking(
             duels=Duel.without_freewins(previous_duels),
             players=all_players,
             personalization=personalization
