@@ -31,3 +31,4 @@ whitenoise==3.3.1
 numpy==1.16.2
 django-autocomplete-light==3.3.2
 sentry-sdk==0.7.7
+matplotlib==3.0.3
