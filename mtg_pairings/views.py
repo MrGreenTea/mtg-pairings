@@ -108,11 +108,6 @@ class ShowPlayer(LoginRequiredMixin, generic.DetailView):
         return context
 
 
-class ProfilePlayer(ShowPlayer):
-    def get_object(self, queryset=None):
-        return self.request.user.player
-
-
 class PlayerAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         # Don't forget to filter out results depending on the visitor !
@@ -125,3 +120,5 @@ class PlayerAutocomplete(autocomplete.Select2QuerySetView):
             qs = qs.filter(name__istartswith=self.q)
 
         return qs
+
+
