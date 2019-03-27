@@ -206,7 +206,7 @@ def ranking(duels, players, draw=False, **kwargs) -> typing.Tuple[typing.Dict[Pl
 
     pageranking = {p: v * 100 for p, v in networkx.pagerank_numpy(win_graph, **kwargs).items()}
 
-    if draw:
+    if draw and win_graph:
         import io
         import matplotlib.pyplot as plt
         from matplotlib.lines import Line2D
@@ -218,7 +218,9 @@ def ranking(duels, players, draw=False, **kwargs) -> typing.Tuple[typing.Dict[Pl
         networkx.draw_networkx_nodes(win_graph, pos, node_size=700)
         max_wins = max(d["weight"] for (u, v, d) in win_graph.edges(data=True))
         color_values = [
-            colors.to_hex(colors.hsv_to_rgb((ratio, 0.9, (ratio+1)/2)))
+            colors.to_hex(
+                colors.hsv_to_rgb((ratio*0.8 + 0.1, 0.9, (ratio+1)/2))
+            )
             for ratio in map(lambda w: w/max_wins, range(1, max_wins+1))
         ]
         legend = []
