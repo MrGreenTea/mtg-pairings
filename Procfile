@@ -1,1 +1,1 @@
-web: gunicorn MTG_Pairing.wsgi
+web: gunicorn config.wsgi
