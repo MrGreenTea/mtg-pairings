@@ -146,3 +146,8 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 CRISPY_FAIL_SILENTLY = not DEBUG
 
 MATCH_WINS_NEEDED = 2
+
+if ENVIRONMENT == "HEROKU":
+    import django_heroku
+    django_heroku.settings(locals())
+
