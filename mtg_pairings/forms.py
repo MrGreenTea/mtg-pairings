@@ -35,10 +35,12 @@ class RoundForm(forms.Form):
 
             self.fields[player_1] = forms.IntegerField(initial=duel.player_1_wins, min_value=0,
                                                        max_value=settings.MATCH_WINS_NEEDED,
-                                                       label=duel.player_1.name, disabled=disabled)
+                                                       label=duel.player_1.name,
+                                                       disabled=disabled, required=False)
             self.fields[player_2] = forms.IntegerField(initial=duel.player_2_wins, min_value=0,
                                                        max_value=settings.MATCH_WINS_NEEDED,
-                                                       label=duel.player_2.name, disabled=disabled)
+                                                       label=duel.player_2.name,
+                                                       disabled=disabled, required=False)
 
         if free_win is not None:
             layout_rows.append(free_win)
@@ -81,6 +83,11 @@ class RoundForm(forms.Form):
                        models.Performance(player_2, wins=player_2_result, losses=value, match_wins=0, match_losses=0))
 
 
+def exclude_freewins():
+    freewin = models.Player.FREEWIN()
+    return ~models.models.Q(name=freewin)
+
+
 class TournamentForm(forms.ModelForm):
     class Meta:
         model = models.Tournament
@@ -91,11 +98,24 @@ class TournamentForm(forms.ModelForm):
         self.helper = crispy_forms.helper.FormHelper()
         self.helper.add_input(layout.Submit('submit', 'Submit'))
 
+    def clean_players(self):
+        players = self.cleaned_data.get("players")
+        if players.count() < 2:
+            raise forms.ValidationError("You need at least two players. More players are always more fun ;)")
+        if players.count() % 2:
+            freewin = models.Player.FREEWIN()
+            assert freewin is not None, "Player.FREEWIN not set!"
+            if freewin in players:
+                raise forms.ValidationError(f"Remove the {freewin} player.")
+
+        return players
+
     name = forms.CharField(required=True)
-    freewin = models.Player.FREEWIN()
     players = forms.ModelMultipleChoiceField(
-        queryset=models.Player.objects.exclude(name=freewin),
+        queryset=models.Player.objects,
+        limit_choices_to=exclude_freewins,
         widget=autocomplete.ModelSelect2Multiple(url="player-autocomplete"),
+        required=True
     )
 
 
