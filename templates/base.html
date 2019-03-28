@@ -31,7 +31,7 @@
                 <a class="nav-link" href="{% url "player_list" %}">Players</a>
             </li>
         </ul>
-        <ul class="nav justify-content-end">
+        <ul class="navbar-nav nav justify-content-end mr-auto">
             {% if user.is_authenticated %}
                 <li class="nav-item">
                     <a class="nav-link" href="{% url "profile" %}">Me</a>
