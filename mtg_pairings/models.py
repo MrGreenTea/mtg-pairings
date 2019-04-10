@@ -7,13 +7,14 @@ from typing import List
 
 import attr
 import networkx.algorithms.matching
+from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, IntegrityError
 from django.db.transaction import atomic
 from django.dispatch import receiver
 from django.urls import reverse
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 
 
 class Player(models.Model):
@@ -155,7 +156,7 @@ class Performance:
 
 
 def standing(duels, players) -> List[Performance]:
-    player_standings = []
+    player_standings: List[Performance] = []
 
     for player in players:
         aggregate = duels.aggregate(
@@ -175,10 +176,7 @@ def standing(duels, players) -> List[Performance]:
             aggregate[key] = 0 if aggregate[key] is None else aggregate[key]
 
         performance = Performance(player, **aggregate)
-        bisect.insort_right(
-            player_standings,
-            performance
-        )
+        bisect.insort_right(player_standings, performance)
 
     return list(reversed(player_standings))  # we sorted from low -> high but want to show high -> low
 
@@ -556,8 +554,36 @@ def assure_players(sender, instance: Tournament, action, **kwargs):
 
 @receiver(models.signals.post_save, sender=User)
 def connect_user_and_player(sender, instance: User, created: bool, **kwargs):
-    if created:
-        player, _ = Player.objects.get_or_create(name=instance.username)
-        assert player.user is None, "A Player with the same name was already connected to another User. This is a gross error"
-        player.user = instance
-        player.save()
+    """
+    Connects new User objects to existing player objects or creates these.
+
+    Will check if only first name already exists,
+    if so and already connected will create a new player with <first> <last>.
+
+
+    sender and kwargs are not used.
+    """
+    if not created:
+        return
+
+    mtg_pairings_app = apps.get_app_config("mtg_pairings")
+    instance.groups.add(Group.objects.get(name=mtg_pairings_app.DEFAULT_GROUP_NAME))
+
+    names = [
+        instance.first_name,
+        instance.last_name,
+        f"{instance.first_name} {instance.last_name}",
+        instance.username
+    ]
+    names = [n.strip() for n in names if n.strip()]
+
+    for name in names:
+        player, player_created = Player.objects.get_or_create(name=name)
+        if player_created or player.user is None:
+            player.user = instance
+            player.save()
+            break
+    else:
+        raise IntegrityError(f"No player object could be connected to user {instance.username}", instance)
+
+

@@ -54,7 +54,7 @@ class RoundForm(forms.Form):
 
         for name, value in cleaned_data.items():
             match = PATTERN.match(name)
-            if match:
+            if match is not None:
                 player_2_id = f'duel-{match.group(1)}-player2'
                 if value < settings.MATCH_WINS_NEEDED and cleaned_data[player_2_id] < settings.MATCH_WINS_NEEDED:
                     self.add_error(
@@ -83,11 +83,6 @@ class RoundForm(forms.Form):
                        models.Performance(player_2, wins=player_2_result, losses=value, match_wins=0, match_losses=0))
 
 
-def exclude_freewins():
-    freewin = models.Player.FREEWIN()
-    return ~models.models.Q(name=freewin)
-
-
 class TournamentForm(forms.ModelForm):
     class Meta:
         model = models.Tournament
@@ -113,9 +108,6 @@ class TournamentForm(forms.ModelForm):
     name = forms.CharField(required=True)
     players = forms.ModelMultipleChoiceField(
         queryset=models.Player.objects,
-        limit_choices_to=exclude_freewins,
         widget=autocomplete.ModelSelect2Multiple(url="player-autocomplete"),
         required=True
     )
-
-
