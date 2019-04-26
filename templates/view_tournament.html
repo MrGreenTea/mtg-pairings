@@ -8,6 +8,7 @@
         <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#player-list" aria-expanded="false" aria-controls="player-list">
             Players
         </button>
+        <a class="btn btn-secondary" role="button" href="{% url "create_teams" object.pk %}">Teams</a>
     </p>
     <div class="table-responsive collapse{% if object.finished %} show {% endif %}" id="player-list">
         <table class="table table-sm table-hover">
@@ -44,9 +45,7 @@
                 <div class="collapse{% if not object.finished and forloop.last%} show{% endif %}" data-parent="#accordion" id="round-{{ round.number }}">
                     <div class="card-body">
                         {% if not object.finished and forloop.last %}
-                            <form method="post" class="uniForm">
-                                {% crispy round_form %}
-                            </form>
+                            {% crispy round_form %}
                         {% else %}
                             <ol>
                                 {% for duel in round.duels.all %}

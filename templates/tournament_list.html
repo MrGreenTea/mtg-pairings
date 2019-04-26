@@ -4,23 +4,20 @@
     <div class="card">
         <div class="card-body">
             <h5 class="card-title">Running Tournaments</h5>
-            <p class="card-text">
-                <ul class="list-unstyled" id="tournament-list">
-                    {% for tournament in object_list %}
-                        <li>
-                            <a href="{{ tournament.get_absolute_url }}">{{ tournament.name }}</a> - {{ tournament.date }}
-                        </li>
-                    {% endfor %}
-                </ul>
-                <a type="button" class="btn btn-primary btn-lg" href="{% url "create_tournament" %}" role="button">Start new tournament</a>
-            </p>
+            <ul class="list-unstyled" id="tournament-list">
+                {% for tournament in object_list %}
+                    <li>
+                        <a href="{{ tournament.get_absolute_url }}">{{ tournament.name }}</a> - {{ tournament.date }}
+                    </li>
+                {% endfor %}
+            </ul>
+            <a type="button" class="btn btn-primary btn-lg" href="{% url "create_tournament" %}" role="button">Start new tournament</a>
         </div>
     </div>
     <div class="card">
         <div class="card-body">
             <div class="card-title">
-                <a href="#" class="text-muted" data-toggle="collapse" data-target="#finished-tournaments"
-                   aria-expanded="false" aria-controls="finished-tournaments">
+                <a href="#" class="text-muted" data-toggle="collapse" data-target="#finished-tournaments" aria-expanded="false" aria-controls="finished-tournaments">
                     Finished Tournaments
                 </a>
             </div>

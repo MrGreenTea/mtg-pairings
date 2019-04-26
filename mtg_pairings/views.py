@@ -25,9 +25,9 @@ class ListTournaments(LoginRequiredMixin, generic.ListView):
 
 
 class CreateTournament(PermissionRequiredMixin, generic.CreateView):
-    permission_required = 'app.add_tournament'
+    permission_required = 'mtg_pairings.add_tournament'
     model = models.Tournament
-    template_name = "tournament_form.html"
+    template_name = "base_form.html"
     form_class = forms.TournamentForm
 
 
@@ -81,6 +81,18 @@ class ShowTournament(LoginRequiredMixin, generic.DetailView):
             )
 
 
+class CreateTeams(LoginRequiredMixin, generic.UpdateView):
+    model = models.Tournament
+    template_name = "team_form.html"
+    form_class = forms.TeamForm
+
+    object: models.Tournament
+
+    def form_valid(self, form):
+        self.object.teams = form.cleaned_data["teams"]
+        return HttpResponseRedirect(self.object.get_absolute_url())
+
+
 class ListPlayers(LoginRequiredMixin, generic.ListView):
     model = models.Player
     template_name = 'player_list.html'
@@ -127,7 +139,8 @@ class PlayerAutocomplete(autocomplete.Select2QuerySetView):
 
         qs = models.Player.without_freewin()
 
-        if self.q:
-            qs = qs.filter(name__istartswith=self.q)
+        query = self.q.strip()
+        if query:
+            qs = qs.filter(name__istartswith=query)
 
         return qs

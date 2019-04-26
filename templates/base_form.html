@@ -2,7 +2,5 @@
 {% load crispy_forms_tags %}
 
 {% block body %}
-    <form method="post" class="uniForm">
-        {% crispy form %}
-    </form>
+    {% block form %}{% crispy form %}{% endblock form %}
 {% endblock body %}

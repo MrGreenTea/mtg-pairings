@@ -9,7 +9,7 @@ urlpatterns = [
     path('players/autocomplete', views.PlayerAutocomplete.as_view(create_field='name'), name="player-autocomplete"),
     path('players/<str:pk>', views.ShowPlayer.as_view(), name='player_detail'),
     path('<int:pk>', views.ShowTournament.as_view(), name='tournament_detail'),
+    path('<int:pk>/teams', views.CreateTeams.as_view(), name='create_teams'),
     path('accounts/', include("mtg_pairings.accounts.urls"))
-
 ]
 

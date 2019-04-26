@@ -1,0 +1,42 @@
+{% extends 'base_form.html' %}
+
+
+{% block extrascripts %}
+    <script>
+        form_count = Number($("[name=team_count]").val());
+
+
+
+        $("#add-another").click(function() {
+            form_count ++;
+
+            const template = `<div class="row">
+   <div id="div_id_team_name_${form_count}" class="form-group">
+      <label for="id_team_name_${form_count}" class="col-form-label  requiredField">
+      Team name ${form_count}<span class="asteriskField">*</span> </label>
+      <div class="">
+         <input type="text" name="team_name_${form_count}" class="textinput textInput form-control" required="" id="id_team_name_${form_count}">
+      </div>
+   </div>
+   <div id="div_id_team_players_${form_count}" class="form-group">
+      <label for="id_team_players_${form_count}" class="col-form-label  requiredField">
+      Team players ${form_count}<span class="asteriskField">*</span> </label>
+      <div class="">
+         <select name="team_players_${form_count}" class="modelselect2multiple form-control select2-hidden-accessible" required="" id="id_team_players_${form_count}" data-autocomplete-light-language="en-US" data-autocomplete-light-url="/players/autocomplete" data-autocomplete-light-function="select2" multiple="" tabindex="-1" aria-hidden="true">
+         </select>
+      </div>
+   </div>
+</div>`;
+
+            element = $(template);
+            // element.attr('name', 'team_name_' + form_count);
+            $("#form > :last-child").before(element);
+            // $("#form > :last-child").before(element);
+            // build element and append it to our forms container
+
+            $("[name=extra_field_count]").val(form_count);
+            // increment form count so our view knows to populate
+            // that many fields for validation
+        })
+    </script>
+{% endblock extrascripts %}

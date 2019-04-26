@@ -12,10 +12,9 @@ def performances(**kwargs):
     return strategies.builds(models.Performance, **parameters)
 
 
-@reproduce_failure('4.9.0', b'AXicY2BAAUwIJgAAMAAD')
 @given(performances(), performances())
 def test_penalty(player_1: models.Performance, player_2: models.Performance):
-    penalty: float = models.penalty(player_1, player_2)
+    penalty: float = models.penalty(float(player_1), float(player_2))
     if player_1 == player_2:
         assert penalty == 0
     else:
