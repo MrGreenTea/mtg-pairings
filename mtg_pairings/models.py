@@ -203,9 +203,16 @@ class Tournament(models.Model):
     @atomic
     def start_first_round(self) -> 'Round':
         freewin = Player.FREEWIN()
-        all_players = set(self.players.all()) - {freewin}  # don't count free wins
+        all_players = set(self.players.all())
 
         player_ranking, _ = ranking(duels=Duel.without_freewins(), players=Player.without_freewin())
+        next_round = Round.objects.create(tournament=self, number=1)
+        if freewin in all_players:
+            last_player = min(player_ranking, key=player_ranking.__getitem__)
+            Duel.objects.create(
+                round=next_round, player_1=last_player, player_2=freewin, player_1_wins=settings.MATCH_WINS_NEEDED
+            )
+            all_players -= {freewin, last_player}  # don't count free wins
 
         graph = networkx.Graph()
 
@@ -215,19 +222,13 @@ class Tournament(models.Model):
         )
 
         matching = networkx.algorithms.matching.max_weight_matching(graph, maxcardinality=True)
-        next_round = Round.objects.create(tournament=self, number=1)
 
         not_matched_players = all_players
         for player_1, player_2 in matching:
             Duel.objects.create(round=next_round, player_1=player_1, player_2=player_2)
-            not_matched_players.remove(player_1)
-            not_matched_players.remove(player_2)
+            not_matched_players -= {player_1, player_2}
 
-        if not_matched_players:
-            assert len(not_matched_players) == 1, "Something went wrong when matching up"
-            last_player = next(iter(not_matched_players))
-            Duel.objects.create(round=next_round, player_1=last_player, player_2=freewin,
-                                player_1_wins=settings.MATCH_WINS_NEEDED)
+        assert not not_matched_players, f"Something went wrong when matching up, {not_matched_players} where not matched up."
 
         return next_round
 

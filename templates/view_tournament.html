@@ -8,7 +8,7 @@
         <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#player-list" aria-expanded="false" aria-controls="player-list">
             Players
         </button>
-        <a class="btn btn-secondary" role="button" href="{% url "create_teams" object.pk %}">Teams</a>
+        <a class="btn btn-secondary disabled" role="button" href="{% url "create_teams" object.pk %}">Teams</a>
     </p>
     <div class="table-responsive collapse{% if object.finished %} show {% endif %}" id="player-list">
         <table class="table table-sm table-hover">
