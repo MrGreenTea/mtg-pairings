@@ -1,6 +1,7 @@
 import base64
 import bisect
 import collections
+import datetime
 import itertools
 import typing
 from typing import List
@@ -163,7 +164,7 @@ class Performance:
 class Tournament(models.Model):
     name = models.CharField(max_length=256)
     players = models.ManyToManyField(Player, related_name='tournaments')
-    date = models.DateField(auto_now_add=True)
+    date = models.DateField(default=datetime.date.today)
     finished = models.BooleanField(default=False)
     teams = JSONField()
 
