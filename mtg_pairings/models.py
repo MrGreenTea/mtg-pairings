@@ -595,4 +595,4 @@ def connect_user_and_player(instance: User, created: bool, **_):
 @receiver(models.signals.pre_save, sender=Player)
 def capitalize_player_names(instance: Player, **_):
     if instance.name != "FREE WIN":
-        instance.name = " ".join(instance.name.strip().capitalize().split())
+        instance.name = " ".join(instance.name.strip().title().split())
