@@ -178,7 +178,7 @@ class Tournament(models.Model):
         if player is not None:
             return self.duels().filter(models.Q(player_1=player) | models.Q(player_2=player))
 
-        return Duel.objects.filter(round__tournament=self)
+        return Duel.objects.filter(round__tournament=self).distinct()
 
     @property
     def standing(self) -> List[Performance]:
@@ -209,7 +209,7 @@ class Tournament(models.Model):
         player_ranking, _ = ranking(duels=Duel.without_freewins(), players=Player.without_freewin())
         next_round = Round.objects.create(tournament=self, number=1)
         if freewin in all_players:
-            last_player = min(player_ranking, key=player_ranking.__getitem__)
+            last_player = min([p for p in player_ranking if p in all_players], key=player_ranking.__getitem__)
             Duel.objects.create(
                 round=next_round, player_1=last_player, player_2=freewin, player_1_wins=settings.MATCH_WINS_NEEDED
             )
@@ -237,52 +237,38 @@ class Tournament(models.Model):
     def start_next_round(self) -> 'Round':
         """Creates and returns the objects for the next round."""
         freewin = Player.FREEWIN()
+        last_round = self.current_round
         all_players = set(self.players.all())
         all_possible_matchings = set(map(frozenset, itertools.combinations(all_players, r=2)))
-        previous_duels = self.duels().distinct()
+        previous_duels = self.duels()
         previous_matchings = set(
             frozenset((duel.player_1, duel.player_2))
             for duel in previous_duels
         )
+
         possible_matchings = all_possible_matchings - previous_matchings
         assert possible_matchings
 
-        personalization = {
-            perf.player: float(perf) for perf in self.standing
-        }
-        player_ranking, _ = ranking(
-            duels=Duel.without_freewins(previous_duels),
-            players=all_players,
-            personalization=personalization
-        )
-        player_ranking[freewin] = -10
+        next_round = Round.objects.create(tournament=self, number=last_round.number + 1)
 
-        extra_matchings = set()
-        if freewin in all_players:
-            freewin_eligible = {
-                p
-                for p in itertools.chain.from_iterable(m for m in possible_matchings if freewin in m)
-                if p != freewin
-            }
-            freewinner = min(freewin_eligible, key=lambda p: player_ranking[p])
-            assert freewin != freewinner
-            freewin_matching = frozenset((freewinner, freewin))
-            # filter out freewin and freewiner from possible matchings.
-            possible_matchings = {m for m in possible_matchings if freewin not in m and freewinner not in m}
-            extra_matchings.add(freewin_matching)
-
-        graph = networkx.Graph()
-
-        graph.add_weighted_edges_from([
-            (player, opponent, penalty(player_ranking[player], player_ranking[opponent]))
-            for player, opponent in possible_matchings
-        ]
-        )
-
-        next_round = Round.objects.create(tournament=self, number=self.current_round.number + 1)
-        matching = networkx.algorithms.matching.max_weight_matching(graph, maxcardinality=True)
+        current_standing = sorted(self.standing, key=lambda p: (p, last_round.get_duel_for_player(p.player).wins_of(p.player)), reverse=True)
+        players_to_match = [p.player for p in current_standing] + [freewin] if freewin in all_players else []
         matched_players = set()
-        for player_1, player_2 in matching | extra_matchings:
+
+        while len(players_to_match) > 1:
+            player = players_to_match.pop(0)
+            for opponent in players_to_match:
+                match = frozenset((player, opponent))
+                if match in possible_matchings:
+                    matched_players.add(match)
+                    players_to_match.remove(opponent)
+                    break
+            else:
+                raise ValueError(f"No opponent found for {player}")
+
+        assert not players_to_match, f'{players_to_match} have not been matched'
+
+        for player_1, player_2 in matched_players:
             assert player_2 not in self.opponents(player_1)
             assert player_1 not in self.opponents(player_2)
             if freewin == player_1:
@@ -292,12 +278,8 @@ class Tournament(models.Model):
                 player_1_wins = settings.MATCH_WINS_NEEDED
             else:
                 player_1_wins = 0
+            Duel.objects.create(player_1=player_1, player_2=player_2, player_1_wins=player_1_wins, round=next_round)
 
-            Duel.objects.create(player_1=player_1, player_2=player_2, round=next_round, player_1_wins=player_1_wins)
-            matched_players.update({player_1, player_2})
-
-        player_diff = all_players - matched_players
-        assert not player_diff, f'{player_diff} have not been matched'
         return next_round
 
     def finish(self):
@@ -612,4 +594,5 @@ def connect_user_and_player(instance: User, created: bool, **_):
 
 @receiver(models.signals.pre_save, sender=Player)
 def capitalize_player_names(instance: Player, **_):
-    instance.name = " ".join(instance.name.strip().capitalize().split())
+    if instance.name != "FREE WIN":
+        instance.name = " ".join(instance.name.strip().capitalize().split())
