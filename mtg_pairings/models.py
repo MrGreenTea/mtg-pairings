@@ -21,7 +21,7 @@ from django.contrib.auth.models import User, Group
 
 class Player(models.Model):
     name = models.CharField(max_length=256, primary_key=True)
-    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True)
+    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True)
     _FREEWIN: "Player" = None
 
     class Meta:
