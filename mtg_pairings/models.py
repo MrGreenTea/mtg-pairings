@@ -264,7 +264,7 @@ class Tournament(models.Model):
                     players_to_match.remove(opponent)
                     break
             else:
-                raise ValueError(f"No opponent found for {player}")
+                raise AssertionError(f"No opponent found for {player}")
 
         assert not players_to_match, f'{players_to_match} have not been matched'
 

@@ -69,7 +69,7 @@ class ShowTournament(LoginRequiredMixin, generic.DetailView):
                 except AssertionError as error:
                     import logging
                     logger = logging.getLogger(__name__)
-                    logger.warning('Error when pairing', exc_info=error)
+                    logger.error('Error when pairing', exc_info=error)
                     messages.warning(request, "Couldn't pair all players for next round. Finished this tournament.")
                     self.object.finish()
                     return HttpResponseRedirect('#finished')
